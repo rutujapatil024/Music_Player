@@ -1,4 +1,4 @@
-let allMusic = []; // comes from backend
+let allMusic = []; 
 
 const wrapper = document.querySelector(".wrapper"),
 musicImg = wrapper.querySelector(".img-area img"),
@@ -17,7 +17,7 @@ repeatBtn = wrapper.querySelector("#repeat-plist");
 
 let musicIndex = 1;
 
-// ⭐ FETCH SONGS FROM BACKEND
+// FETCH SONGS FROM BACKEND
 async function loadSongsFromBackend() {
     const res = await fetch("http://localhost:5000/api/songs");
     const songs = await res.json();
@@ -25,13 +25,12 @@ async function loadSongsFromBackend() {
     allMusic = songs.map((s) => ({
         name: s.title,
         artist: s.artist,
-        img: s.image,      // full URL
-        src: s.audio,      // full URL
+        img: s.image,      
+        src: s.audio,      
         duration: s.duration
     }));
 }
 
-// ⭐ INITIAL LOAD
 window.addEventListener("load", async () => {
     await loadSongsFromBackend();
     musicIndex = Math.floor((Math.random()*allMusic.length)+1);
@@ -40,7 +39,7 @@ window.addEventListener("load", async () => {
     playingNow();
 });
 
-// ⭐ LOAD MUSIC FUNCTION
+//LOAD MUSIC FUNCTION
 function loadMusic(indexNumb){
     musicName.innerText = allMusic[indexNumb -1].name;
     musicArtist.innerText = allMusic[indexNumb -1].artist;
@@ -48,7 +47,7 @@ function loadMusic(indexNumb){
     mainAudio.src = allMusic[indexNumb - 1].src;
 }
 
-// ⭐ PLAY / PAUSE CONTROLS
+//PLAY / PAUSE CONTROLS
 function playMusic(){
     wrapper.classList.add("paused");
     playPauseBtn.querySelector("i").innerText = "pause";
@@ -82,7 +81,7 @@ playPauseBtn.addEventListener("click", ()=>{
 nextBtn.addEventListener("click", nextMusic);
 prevBtn.addEventListener("click", prevMusic);
 
-// ⭐ PROGRESS BAR UPDATE
+//PROGRESS BAR UPDATE
 mainAudio.addEventListener("timeupdate",(e)=>{
     const currentTime = e.target.currentTime;
     const duration = e.target.duration;
@@ -97,7 +96,7 @@ mainAudio.addEventListener("timeupdate",(e)=>{
     wrapper.querySelector(".duration").innerText = `${totalMin}:${totalSec}`;
 });
 
-// ⭐ SEEK BAR
+// SEEK BAR
 progressArea.addEventListener("click",(e)=>{
     let clickedX = e.offsetX;
     let width = progressArea.clientWidth;
@@ -105,7 +104,7 @@ progressArea.addEventListener("click",(e)=>{
     playMusic();
 });
 
-// ⭐ REPEAT / SHUFFLE
+//REPEAT / SHUFFLE
 repeatBtn.addEventListener("click", ()=>{
     let text = repeatBtn.innerText;
     if (text === "repeat") {
@@ -134,11 +133,11 @@ mainAudio.addEventListener("ended",()=>{
     }
 });
 
-// ⭐ SHOW PLAYLIST
+//SHOW PLAYLIST
 showMoreBtn.addEventListener("click",()=> musicList.classList.toggle("show"));
 hideMusicBtn.addEventListener("click",()=> showMoreBtn.click());
 
-// ⭐ GENERATE PLAYLIST FROM BACKEND DATA
+//GENERATE PLAYLIST FROM BACKEND DATA
 function generatePlaylist() {
     const ulTag = wrapper.querySelector("ul");
     ulTag.innerHTML = "";
@@ -166,7 +165,7 @@ function generatePlaylist() {
     }
 }
 
-// ⭐ PLAYING NOW HIGHLIGHT
+//PLAYING NOW HIGHLIGHT
 function playingNow(){
     const allLiTags = wrapper.querySelectorAll("ul li");
 
