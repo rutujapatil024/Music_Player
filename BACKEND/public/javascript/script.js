@@ -1,178 +1,255 @@
-let allMusic = []; 
-
-const wrapper = document.querySelector(".wrapper"),
-musicImg = wrapper.querySelector(".img-area img"),
-musicName = wrapper.querySelector(".song-details .name"),
-musicArtist = wrapper.querySelector(".song-details .artist"),
-mainAudio = wrapper.querySelector("#main-audio"),
-playPauseBtn = wrapper.querySelector(".play-pause"),
-prevBtn = wrapper.querySelector("#prev"),
-nextBtn = wrapper.querySelector("#next"),
-progressArea = wrapper.querySelector(".progress-area"),
-progressBar = wrapper.querySelector(".progress-bar"),
-musicList = wrapper.querySelector(".music-list"),
-showMoreBtn = wrapper.querySelector("#more-music"),
-hideMusicBtn = musicList.querySelector("#close"),
-repeatBtn = wrapper.querySelector("#repeat-plist");
-
+let allMusic = [];
 let musicIndex = 1;
 
-// FETCH SONGS FROM BACKEND
+// MAIN ELEMENTS
+const wrapper = document.querySelector(".wrapper");
+const musicImg = wrapper.querySelector(".img-area img");
+const musicName = wrapper.querySelector(".song-details .name");
+const musicArtist = wrapper.querySelector(".song-details .artist");
+const mainAudio = wrapper.querySelector("#main-audio");
+
+const playPauseBtn = wrapper.querySelector(".play-pause");
+const prevBtn = wrapper.querySelector("#prev");
+const nextBtn = wrapper.querySelector("#next");
+const progressArea = wrapper.querySelector(".progress-area");
+const progressBar = wrapper.querySelector(".progress-bar");
+const musicList = wrapper.querySelector(".music-list");
+
+const showMoreBtn = wrapper.querySelector("#more-music");
+const hideMusicBtn = musicList.querySelector("#close");
+const repeatBtn = wrapper.querySelector("#repeat-plist");
+
+const likeBtn = wrapper.querySelector("#like");
+const addToListBtn = wrapper.querySelector("#addtoplist");
+
+// ---------------- LOAD SONGS ----------------
 async function loadSongsFromBackend() {
-    const res = await fetch("http://localhost:5000/api/songs");
-    const songs = await res.json();
+  const res = await fetch("/api/songs");
+  const songs = await res.json();
 
-    allMusic = songs.map((s) => ({
-        name: s.title,
-        artist: s.artist,
-        img: s.image,      
-        src: s.audio,      
-        duration: s.duration
-    }));
+  // keep MongoDB _id
+  allMusic = songs.map(s => ({
+    id: s._id,
+    title: s.title,
+    artist: s.artist,
+    image: s.image,
+    audio: s.audio,
+    duration: s.duration
+  }));
 }
 
+// ---------------- PAGE LOAD ----------------
 window.addEventListener("load", async () => {
-    await loadSongsFromBackend();
-    musicIndex = Math.floor((Math.random()*allMusic.length)+1);
-    loadMusic(musicIndex);
-    generatePlaylist();
-    playingNow();
+  loadUserProfile();
+  await loadSongsFromBackend();
+
+  if (allMusic.length === 0) return;
+
+  musicIndex = Math.floor(Math.random() * allMusic.length) + 1;
+  loadMusic(musicIndex);
+  generatePlaylist();
+  playingNow();
+  updateLikeIcon();
 });
 
-//LOAD MUSIC FUNCTION
-function loadMusic(indexNumb){
-    musicName.innerText = allMusic[indexNumb -1].name;
-    musicArtist.innerText = allMusic[indexNumb -1].artist;
-    musicImg.src = allMusic[indexNumb - 1].img;
-    mainAudio.src = allMusic[indexNumb - 1].src;
+// ---------------- USER PROFILE ----------------
+function loadUserProfile() {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) return;
+
+  document.getElementById("profileUsername").innerText = user.username;
+  document.getElementById("profileEmail").innerText = user.email;
 }
 
-//PLAY / PAUSE CONTROLS
-function playMusic(){
-    wrapper.classList.add("paused");
-    playPauseBtn.querySelector("i").innerText = "pause";
-    mainAudio.play();
-}
-function pauseMusic(){
-    wrapper.classList.remove("paused");
-    playPauseBtn.querySelector("i").innerText = "play_arrow";
-    mainAudio.pause();
-}
-function nextMusic(){
-    musicIndex++;
-    if (musicIndex > allMusic.length) musicIndex = 1;
-    loadMusic(musicIndex);
-    playMusic();
-    playingNow();
-}
-function prevMusic(){
-    musicIndex--;
-    if (musicIndex < 1) musicIndex = allMusic.length;
-    loadMusic(musicIndex);
-    playMusic();
-    playingNow();
+// ---------------- LOGOUT ----------------
+function logout() {
+  localStorage.removeItem("user");
+  window.location.href = "login.html";
 }
 
-playPauseBtn.addEventListener("click", ()=>{
-    const isMusicPaused = wrapper.classList.contains("paused");
-    isMusicPaused ? pauseMusic() : playMusic();
-    playingNow();
-});
-nextBtn.addEventListener("click", nextMusic);
-prevBtn.addEventListener("click", prevMusic);
+// ---------------- LOAD MUSIC ----------------
+function loadMusic(index) {
+  const song = allMusic[index - 1];
 
-//PROGRESS BAR UPDATE
-mainAudio.addEventListener("timeupdate",(e)=>{
-    const currentTime = e.target.currentTime;
-    const duration = e.target.duration;
-    progressBar.style.width = `${(currentTime/duration)*100}%`;
+  musicName.innerText = song.title;
+  musicArtist.innerText = song.artist;
+  musicImg.src = song.image;
+  mainAudio.src = song.audio;
 
-    let currentMin = Math.floor(currentTime/60);
-    let currentSec = Math.floor(currentTime%60).toString().padStart(2,"0");
-    wrapper.querySelector(".current").innerText = `${currentMin}:${currentSec}`;
+  updateLikeIcon();
+}
 
-    let totalMin = Math.floor(duration/60);
-    let totalSec = Math.floor(duration%60).toString().padStart(2,"0");
-    wrapper.querySelector(".duration").innerText = `${totalMin}:${totalSec}`;
-});
+// ---------------- PLAY / PAUSE ----------------
+function playMusic() {
+  wrapper.classList.add("paused");
+  playPauseBtn.querySelector("i").innerText = "pause";
+  mainAudio.play();
+}
 
-// SEEK BAR
-progressArea.addEventListener("click",(e)=>{
-    let clickedX = e.offsetX;
-    let width = progressArea.clientWidth;
-    mainAudio.currentTime = (clickedX/width) * mainAudio.duration;
-    playMusic();
+function pauseMusic() {
+  wrapper.classList.remove("paused");
+  playPauseBtn.querySelector("i").innerText = "play_arrow";
+  mainAudio.pause();
+}
+
+playPauseBtn.addEventListener("click", () => {
+  wrapper.classList.contains("paused") ? pauseMusic() : playMusic();
 });
 
-//REPEAT / SHUFFLE
-repeatBtn.addEventListener("click", ()=>{
-    let text = repeatBtn.innerText;
-    if (text === "repeat") {
-        repeatBtn.innerText = "repeat_one";
-    } else if (text === "repeat_one") {
-        repeatBtn.innerText = "shuffle";
-    } else {
-        repeatBtn.innerText = "repeat";
-    }
+// ---------------- NEXT / PREV ----------------
+nextBtn.addEventListener("click", () => {
+  musicIndex++;
+  if (musicIndex > allMusic.length) musicIndex = 1;
+  loadMusic(musicIndex);
+  playMusic();
+  playingNow();
 });
 
-mainAudio.addEventListener("ended",()=>{
-    if (repeatBtn.innerText === "repeat") nextMusic();
-    else if (repeatBtn.innerText === "repeat_one") {
-        mainAudio.currentTime = 0;
-        playMusic();
-    }
-    else if (repeatBtn.innerText === "shuffle") {
-        let rand;
-        do { rand = Math.floor((Math.random() * allMusic.length) + 1); }
-        while(rand === musicIndex);
-        musicIndex = rand;
-        loadMusic(musicIndex);
-        playMusic();
-        playingNow();
-    }
+prevBtn.addEventListener("click", () => {
+  musicIndex--;
+  if (musicIndex < 1) musicIndex = allMusic.length;
+  loadMusic(musicIndex);
+  playMusic();
+  playingNow();
 });
 
-//SHOW PLAYLIST
-showMoreBtn.addEventListener("click",()=> musicList.classList.toggle("show"));
-hideMusicBtn.addEventListener("click",()=> showMoreBtn.click());
+// ---------------- LIKE BUTTON ----------------
+likeBtn.addEventListener("click", async () => {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) {
+    alert("Please login first");
+    return;
+  }
 
-//GENERATE PLAYLIST FROM BACKEND DATA
+  const songId = allMusic[musicIndex - 1].id;
+
+  const res = await fetch("/api/like", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userId: user.userId,
+      songId
+    })
+  });
+
+  const data = await res.json();
+  alert(data.message);
+
+  likeBtn.innerText = "favorite";
+  loadLikedSongs();
+});
+
+// ---------------- UPDATE LIKE ICON ----------------
+async function updateLikeIcon() {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) {
+    likeBtn.innerText = "favorite_border";
+    return;
+  }
+
+  const res = await fetch(`/api/likes/${user.userId}`);
+  const likedSongs = await res.json();
+
+  const currentSongId = allMusic[musicIndex - 1].id;
+  const liked = likedSongs.some(s => s._id === currentSongId);
+
+  likeBtn.innerText = liked ? "favorite" : "favorite_border";
+}
+
+// ---------------- PLAY FROM PROFILE ----------------
+function playFromExternalList(song) {
+  mainAudio.src = song.audio;
+  musicImg.src = song.image;
+  musicName.innerText = song.title;
+  musicArtist.innerText = song.artist;
+  playMusic();
+}
+
+// ---------------- LOAD LIKED SONGS ----------------
+async function loadLikedSongs() {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) return;
+
+  const res = await fetch(`/api/likes/${user.userId}`);
+  const songs = await res.json();
+
+  const ul = document.getElementById("likedSongsList");
+  ul.innerHTML = "";
+
+  songs.forEach(song => {
+    const li = document.createElement("li");
+    li.innerText = `${song.title} - ${song.artist}`;
+    li.onclick = () => playFromExternalList(song);
+    ul.appendChild(li);
+  });
+}
+
+// ---------------- ADD TO PLAYLIST ----------------
+addToListBtn.addEventListener("click", async () => {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) {
+    alert("Please login first");
+    return;
+  }
+
+  const songId = allMusic[musicIndex - 1].id;
+
+  const res = await fetch("/api/playlist/add", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userId: user.userId,
+      playlistName: "My Playlist",
+      songId
+    })
+  });
+
+  const data = await res.json();
+  alert(data.message);
+
+  loadPlaylists();
+});
+
+// ---------------- PLAYLIST UI ----------------
+showMoreBtn.addEventListener("click", () => musicList.classList.toggle("show"));
+hideMusicBtn.addEventListener("click", () => showMoreBtn.click());
+
+// ---------------- GENERATE PLAYLIST ----------------
 function generatePlaylist() {
-    const ulTag = wrapper.querySelector("ul");
-    ulTag.innerHTML = "";
+  const ul = wrapper.querySelector("ul");
+  ul.innerHTML = "";
 
-    for (let i = 0; i < allMusic.length; i++) {
-        let li = document.createElement("li");
-        li.setAttribute("li-index", i + 1);
+  allMusic.forEach((song, i) => {
+    const li = document.createElement("li");
+    li.setAttribute("li-index", i + 1);
 
-        li.innerHTML = `
-            <div class="row">
-                <span>${allMusic[i].name}</span>
-                <p>${allMusic[i].artist}</p>
-            </div>
-            <span class="audio-duration">${allMusic[i].duration}</span>
-        `;
+    li.innerHTML = `
+      <div class="row">
+        <span>${song.title}</span>
+        <p>${song.artist}</p>
+      </div>
+      <span>${song.duration}</span>
+    `;
 
-        li.onclick = () => {
-            musicIndex = i + 1;
-            loadMusic(musicIndex);
-            playMusic();
-            playingNow();
-        };
+    li.onclick = () => {
+      musicIndex = i + 1;
+      loadMusic(musicIndex);
+      playMusic();
+      playingNow();
+    };
 
-        ulTag.appendChild(li);
-    }
+    ul.appendChild(li);
+  });
 }
 
-//PLAYING NOW HIGHLIGHT
-function playingNow(){
-    const allLiTags = wrapper.querySelectorAll("ul li");
+// ---------------- PLAYING NOW ----------------
+function playingNow() {
+  const lis = wrapper.querySelectorAll("ul li");
 
-    allLiTags.forEach(li => {
-        li.classList.remove("playing");
-        if (li.getAttribute("li-index") == musicIndex) {
-            li.classList.add("playing");
-        }
-    });
+  lis.forEach(li => {
+    li.classList.remove("playing");
+    if (li.getAttribute("li-index") == musicIndex) {
+      li.classList.add("playing");
+    }
+  });
 }
