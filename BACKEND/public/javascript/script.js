@@ -1,7 +1,7 @@
 let allMusic = [];
 let musicIndex = 1;
 
-// MAIN ELEMENTS
+/* ================= ELEMENTS ================= */
 const wrapper = document.querySelector(".wrapper");
 const musicImg = wrapper.querySelector(".img-area img");
 const musicName = wrapper.querySelector(".song-details .name");
@@ -13,21 +13,26 @@ const prevBtn = wrapper.querySelector("#prev");
 const nextBtn = wrapper.querySelector("#next");
 const progressArea = wrapper.querySelector(".progress-area");
 const progressBar = wrapper.querySelector(".progress-bar");
-const musicList = wrapper.querySelector(".music-list");
 
+const musicList = wrapper.querySelector(".music-list");
 const showMoreBtn = wrapper.querySelector("#more-music");
 const hideMusicBtn = musicList.querySelector("#close");
 const repeatBtn = wrapper.querySelector("#repeat-plist");
 
-const likeBtn = wrapper.querySelector("#like");
-const addToListBtn = wrapper.querySelector("#addtoplist");
+const likeBtn = document.getElementById("like");
+const addToListBtn = document.getElementById("addtoplist");
 
-// ---------------- LOAD SONGS ----------------
+/* ================= AUTH ================= */
+function logout() {
+  localStorage.removeItem("user");
+  window.location.href = "login.html";
+}
+
+/* ================= LOAD SONGS ================= */
 async function loadSongsFromBackend() {
   const res = await fetch("/api/songs");
   const songs = await res.json();
 
-  // keep MongoDB _id
   allMusic = songs.map(s => ({
     id: s._id,
     title: s.title,
@@ -38,48 +43,44 @@ async function loadSongsFromBackend() {
   }));
 }
 
-// ---------------- PAGE LOAD ----------------
+/* ================= PAGE LOAD ================= */
 window.addEventListener("load", async () => {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) {
+    window.location.href = "login.html";
+    return;
+  }
+
   loadUserProfile();
   await loadSongsFromBackend();
 
-  if (allMusic.length === 0) return;
+  if (!allMusic.length) return;
 
-  musicIndex = Math.floor(Math.random() * allMusic.length) + 1;
+  musicIndex = 1;
   loadMusic(musicIndex);
   generatePlaylist();
   playingNow();
   updateLikeIcon();
 });
 
-// ---------------- USER PROFILE ----------------
+/* ================= USER PROFILE ================= */
 function loadUserProfile() {
   const user = JSON.parse(localStorage.getItem("user"));
-  if (!user) return;
-
   document.getElementById("profileUsername").innerText = user.username;
   document.getElementById("profileEmail").innerText = user.email;
 }
 
-// ---------------- LOGOUT ----------------
-function logout() {
-  localStorage.removeItem("user");
-  window.location.href = "login.html";
-}
-
-// ---------------- LOAD MUSIC ----------------
+/* ================= LOAD MUSIC ================= */
 function loadMusic(index) {
   const song = allMusic[index - 1];
-
   musicName.innerText = song.title;
   musicArtist.innerText = song.artist;
   musicImg.src = song.image;
   mainAudio.src = song.audio;
-
   updateLikeIcon();
 }
 
-// ---------------- PLAY / PAUSE ----------------
+/* ================= PLAY / PAUSE ================= */
 function playMusic() {
   wrapper.classList.add("paused");
   playPauseBtn.querySelector("i").innerText = "pause";
@@ -96,80 +97,76 @@ playPauseBtn.addEventListener("click", () => {
   wrapper.classList.contains("paused") ? pauseMusic() : playMusic();
 });
 
-// ---------------- NEXT / PREV ----------------
-nextBtn.addEventListener("click", () => {
-  musicIndex++;
-  if (musicIndex > allMusic.length) musicIndex = 1;
+/* ================= NEXT / PREV ================= */
+nextBtn.onclick = () => {
+  musicIndex = musicIndex >= allMusic.length ? 1 : musicIndex + 1;
   loadMusic(musicIndex);
   playMusic();
   playingNow();
-});
+};
 
-prevBtn.addEventListener("click", () => {
-  musicIndex--;
-  if (musicIndex < 1) musicIndex = allMusic.length;
+prevBtn.onclick = () => {
+  musicIndex = musicIndex <= 1 ? allMusic.length : musicIndex - 1;
   loadMusic(musicIndex);
   playMusic();
   playingNow();
+};
+// ================= PROGRESS BAR UPDATE =================
+mainAudio.addEventListener("timeupdate", () => {
+  if (!mainAudio.duration) return;
+
+  const progressWidth =
+    (mainAudio.currentTime / mainAudio.duration) * 100;
+  progressBar.style.width = `${progressWidth}%`;
+
+  // time display
+  const current = wrapper.querySelector(".current");
+  const duration = wrapper.querySelector(".duration");
+
+  let curMin = Math.floor(mainAudio.currentTime / 60);
+  let curSec = Math.floor(mainAudio.currentTime % 60);
+  if (curSec < 10) curSec = `0${curSec}`;
+
+  let durMin = Math.floor(mainAudio.duration / 60);
+  let durSec = Math.floor(mainAudio.duration % 60);
+  if (durSec < 10) durSec = `0${durSec}`;
+
+  current.innerText = `${curMin}:${curSec}`;
+  duration.innerText = `${durMin}:${durSec}`;
+});
+// ================= SEEK / DRAG =================
+progressArea.addEventListener("click", e => {
+  const width = progressArea.clientWidth;
+  const clickX = e.offsetX;
+  const duration = mainAudio.duration;
+
+  mainAudio.currentTime = (clickX / width) * duration;
 });
 
-// ---------------- LIKE BUTTON ----------------
+/* ================= LIKE / UNLIKE ================= */
 likeBtn.addEventListener("click", async () => {
   const user = JSON.parse(localStorage.getItem("user"));
-  if (!user) {
-    alert("Please login first");
-    return;
-  }
-
   const songId = allMusic[musicIndex - 1].id;
 
-  const res = await fetch("/api/like", {
+  const isLiked = likeBtn.innerText === "favorite";
+  const url = isLiked ? "/api/unlike" : "/api/like";
+
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      userId: user.userId,
-      songId
-    })
+    body: JSON.stringify({ userId: user.userId, songId })
   });
 
   const data = await res.json();
   alert(data.message);
 
-  likeBtn.innerText = "favorite";
+  likeBtn.innerText = isLiked ? "favorite_border" : "favorite";
   loadLikedSongs();
 });
 
-// ---------------- UPDATE LIKE ICON ----------------
-async function updateLikeIcon() {
-  const user = JSON.parse(localStorage.getItem("user"));
-  if (!user) {
-    likeBtn.innerText = "favorite_border";
-    return;
-  }
-
-  const res = await fetch(`/api/likes/${user.userId}`);
-  const likedSongs = await res.json();
-
-  const currentSongId = allMusic[musicIndex - 1].id;
-  const liked = likedSongs.some(s => s._id === currentSongId);
-
-  likeBtn.innerText = liked ? "favorite" : "favorite_border";
-}
-
-// ---------------- PLAY FROM PROFILE ----------------
-function playFromExternalList(song) {
-  mainAudio.src = song.audio;
-  musicImg.src = song.image;
-  musicName.innerText = song.title;
-  musicArtist.innerText = song.artist;
-  playMusic();
-}
-
-// ---------------- LOAD LIKED SONGS ----------------
+/* ================= LIKED SONGS ================= */
 async function loadLikedSongs() {
   const user = JSON.parse(localStorage.getItem("user"));
-  if (!user) return;
-
   const res = await fetch(`/api/likes/${user.userId}`);
   const songs = await res.json();
 
@@ -184,14 +181,9 @@ async function loadLikedSongs() {
   });
 }
 
-// ---------------- ADD TO PLAYLIST ----------------
+/* ================= PLAYLIST ================= */
 addToListBtn.addEventListener("click", async () => {
   const user = JSON.parse(localStorage.getItem("user"));
-  if (!user) {
-    alert("Please login first");
-    return;
-  }
-
   const songId = allMusic[musicIndex - 1].id;
 
   const res = await fetch("/api/playlist/add", {
@@ -206,23 +198,64 @@ addToListBtn.addEventListener("click", async () => {
 
   const data = await res.json();
   alert(data.message);
-
   loadPlaylists();
 });
 
-// ---------------- PLAYLIST UI ----------------
-showMoreBtn.addEventListener("click", () => musicList.classList.toggle("show"));
-hideMusicBtn.addEventListener("click", () => showMoreBtn.click());
+async function loadPlaylists() {
+  const user = JSON.parse(localStorage.getItem("user"));
+  const res = await fetch(`/api/playlists/${user.userId}`);
+  const playlists = await res.json();
 
-// ---------------- GENERATE PLAYLIST ----------------
+  const ul = document.getElementById("playlistList");
+  ul.innerHTML = "";
+
+  playlists.forEach(pl => {
+    const li = document.createElement("li");
+    li.innerText = pl.name;
+    ul.appendChild(li);
+
+    pl.songs.forEach(song => {
+      const s = document.createElement("li");
+      s.innerText = "• " + song.title;
+      s.onclick = () => playFromExternalList(song);
+      ul.appendChild(s);
+    });
+  });
+}
+
+/* ================= PROFILE SIDEBAR ================= */
+function openProfile() {
+  document.getElementById("profileSidebar").style.left = "0";
+  document.querySelector(".profile-btn").style.display = "none";
+  loadLikedSongs();
+  loadPlaylists();
+}
+
+function closeProfile() {
+  document.getElementById("profileSidebar").style.left = "-320px";
+  document.querySelector(".profile-btn").style.display = "block";
+}
+
+/* ================= PLAY EXTERNAL ================= */
+function playFromExternalList(song) {
+  mainAudio.src = song.audio;
+  musicImg.src = song.image;
+  musicName.innerText = song.title;
+  musicArtist.innerText = song.artist;
+  playMusic();
+}
+
+/* ================= PLAYLIST UI ================= */
+showMoreBtn.onclick = () => musicList.classList.toggle("show");
+hideMusicBtn.onclick = () => showMoreBtn.click();
+
 function generatePlaylist() {
-  const ul = wrapper.querySelector("ul");
+const ul = document.querySelector(".music-list ul");
   ul.innerHTML = "";
 
   allMusic.forEach((song, i) => {
     const li = document.createElement("li");
     li.setAttribute("li-index", i + 1);
-
     li.innerHTML = `
       <div class="row">
         <span>${song.title}</span>
@@ -230,26 +263,18 @@ function generatePlaylist() {
       </div>
       <span>${song.duration}</span>
     `;
-
     li.onclick = () => {
       musicIndex = i + 1;
       loadMusic(musicIndex);
       playMusic();
       playingNow();
     };
-
     ul.appendChild(li);
   });
 }
 
-// ---------------- PLAYING NOW ----------------
 function playingNow() {
-  const lis = wrapper.querySelectorAll("ul li");
-
-  lis.forEach(li => {
-    li.classList.remove("playing");
-    if (li.getAttribute("li-index") == musicIndex) {
-      li.classList.add("playing");
-    }
+  document.querySelectorAll("ul li").forEach(li => {
+    li.classList.toggle("playing", li.getAttribute("li-index") == musicIndex);
   });
 }

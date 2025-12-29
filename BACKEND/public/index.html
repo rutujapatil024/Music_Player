@@ -7,194 +7,93 @@
 
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-
-  <script>
-  const user = localStorage.getItem("user");
-
-  if (!user) {
-    window.location.href = "login.html";
-  }
-</script>
-
+  
 </head>
 
 <body>
 
-  <!-- LEFT PROFILE SIDEBAR -->
-  <div id="profileSidebar" class="profile-sidebar">
-    <h3>My Profile</h3>
+<!-- PROFILE SIDEBAR -->
+<div id="profileSidebar" class="profile-sidebar">
+  <h3>My Profile</h3>
 
-    <div class="profile-section">
-      <p><strong>Username:</strong> <span id="profileUsername">Guest</span></p>
-      <p><strong>Email:</strong> <span id="profileEmail">-</span></p>
-    </div>
-<button onclick="logout()">Logout</button>
+  <p><strong>Username:</strong> <span id="profileUsername"></span></p>
+  <p><strong>Email:</strong> <span id="profileEmail"></span></p>
 
-<script>
-function logout() {
-  localStorage.removeItem("user");
-  window.location.href = "login.html";
-}
-</script>
+  <button onclick="logout()">Logout</button>
 
-    <hr>
+  <hr>
 
-    <div class="profile-section">
-      <h4>Liked Songs</h4>
-      <ul id="likedSongsList"></ul>
-    </div>
+  <h4>Liked Songs</h4>
+  <ul id="likedSongsList"></ul>
 
-    <hr>
+  <hr>
 
-    <div class="profile-section">
-      <h4>My Playlists</h4>
-      <ul id="playlistList"></ul>
-    </div>
+  <h4>My Playlist</h4>
+  <ul id="playlistList"></ul>
 
-    <button onclick="closeProfile()">Close</button>
-  </div>
-
-  <!-- PROFILE ICON -->
-  <div class="profile-btn" onclick="openProfile()">
-    <i class="material-icons">account_circle</i>
-
-  </div>
-
-  <!-- SEARCH -->
-  <div class="search-box">
-    <input
-      type="text"
-      id="searchInput"
-      placeholder="Search song..."
-    />
-    <button onclick="searchSong()">Search</button>
-  
-
-  <!-- MUSIC PLAYER -->
-  <div class="wrapper">
-
-    <div class="top-bar">
-      <i class="material-icons" id="addtoplist">add</i>
-      <span>Now Playing</span>
-      <i class="material-icons" id="like">favorite_border</i>
-    </div>
-
-    <div class="img-area">
-      <img src="" alt="song image">
-    </div>
-
-    <div class="song-details">
-      <p class="name"></p>
-      <p class="artist"></p>
-    </div>
-
-    <div class="progress-area">
-      <div class="progress-bar"></div>
-      <div class="timer">
-        <span class="current">0:00</span>
-        <span class="duration">0:00</span>
-      </div>
-      <audio id="main-audio"></audio>
-    </div>
-
-    <div class="controls">
-      <i id="repeat-plist" class="material-icons">repeat</i>
-      <i id="prev" class="material-icons">skip_previous</i>
-      <div class="play-pause">
-        <i class="material-icons">play_arrow</i>
-      </div>
-      <i id="next" class="material-icons">skip_next</i>
-      <i id="more-music" class="material-icons">queue_music</i>
-    </div>
-
-    <div class="music-list">
-      <div class="header">
-        <div class="row">
-          <i class="material-icons">queue_music</i>
-          <span>Music List</span>
-        </div>
-        <i id="close" class="material-icons">close</i>
-      </div>
-      <ul></ul>
-    </div>
+  <button onclick="closeProfile()">Close</button>
 </div>
+
+<!-- PROFILE ICON -->
+<div class="profile-btn" onclick="openProfile()">
+  <i class="material-icons">account_circle</i>
+</div>
+
+<!-- SEARCH -->
+<div class="search-box">
+  <input type="text" id="searchInput" placeholder="Search song..." />
+  <button onclick="searchSong()">Search</button>
+</div>
+
+<!-- MUSIC PLAYER -->
+<div class="wrapper">
+
+  <div class="top-bar">
+    <i class="material-icons" id="addtoplist">add</i>
+    <span>Now Playing</span>
+    <i class="material-icons" id="like">favorite_border</i>
   </div>
 
-  <script>
-  function openProfile() {
-    document.getElementById("profileSidebar").style.left = "0";
-    document.querySelector(".profile-btn").style.display = "none";
-  }
+  <div class="img-area">
+    <img src="" alt="song image">
+  </div>
 
-  function closeProfile() {
-    document.getElementById("profileSidebar").style.left = "-320px";
-    document.querySelector(".profile-btn").style.display = "block";
-  }
-  async function loadLikedSongs() {
-  const user = JSON.parse(localStorage.getItem("user"));
-  
-  if (!user) return;
+  <div class="song-details">
+    <p class="name"></p>
+    <p class="artist"></p>
+  </div>
 
-  const res = await fetch(`/api/likes/${user.userId}`);
-  const songs = await res.json();
+  <!-- PROGRESS + SEEK -->
+  <div class="progress-area">
+    <div class="progress-bar"></div>
+    <div class="timer">
+      <span class="current">0:00</span>
+      <span class="duration">0:00</span>
+    </div>
+    <audio id="main-audio"></audio>
+  </div>
 
-  const ul = document.getElementById("likedSongsList");
-  ul.innerHTML = "";
+  <!-- CONTROLS -->
+  <div class="controls">
+    <i id="repeat-plist" class="material-icons">repeat</i>
+    <i id="prev" class="material-icons">skip_previous</i>
+    <div class="play-pause">
+      <i class="material-icons">play_arrow</i>
+    </div>
+    <i id="next" class="material-icons">skip_next</i>
+    <i id="more-music" class="material-icons">queue_music</i>
+  </div>
 
-  songs.forEach(song => {
-    const li = document.createElement("li");
-    li.innerText = `${song.title} - ${song.artist}`;
+  <!-- PLAYLIST -->
+  <div class="music-list">
+    <div class="header">
+      <span>Music List</span>
+      <i id="close" class="material-icons">close</i>
+    </div>
+    <ul></ul>
+  </div>
+</div>
 
-    li.onclick = () => playFromExternalList(song);
-
-    ul.appendChild(li);
-  });
-}
-function openProfile() {
-  document.getElementById("profileSidebar").style.left = "0";
-  document.querySelector(".profile-btn").style.display = "none";
-  loadLikedSongs();
-  loadPlaylists();
-}
-async function loadPlaylists() {
-  const user = JSON.parse(localStorage.getItem("user"));
-  if (!user) return;
-
-  const res = await fetch(`/api/playlists/${user.userId}`);
-  const playlists = await res.json();
-
-  const ul = document.getElementById("playlistList");
-  ul.innerHTML = "";
-
-  playlists.forEach(pl => {
-    const li = document.createElement("li");
-    li.innerText = pl.name;
-
-    const songUl = document.createElement("ul");
-
-    pl.songs.forEach(song => {
-      const songLi = document.createElement("li");
-      songLi.innerText = song.title;
-      songLi.onclick = () => playFromExternalList(song);
-      songUl.appendChild(songLi);
-    });
-
-    ul.appendChild(li);
-    ul.appendChild(songUl);
-  });
-}
-function playFromExternalList(song) {
-  mainAudio.src = song.audio;
-  musicImg.src = song.image;
-  musicName.innerText = song.title;
-  musicArtist.innerText = song.artist;
-
-  playMusic();
-}
-
-</script>
-
-
-  <script src="javascript/script.js"></script>
+<script src="javascript/script.js"></script>
 </body>
 </html>
