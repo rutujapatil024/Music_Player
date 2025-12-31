@@ -1,5 +1,7 @@
 let allMusic = [];
 let musicIndex = 1;
+let isShuffle = false;
+let isLoop = false;
 
 /* ================= ELEMENTS ================= */
 const wrapper = document.querySelector(".wrapper");
@@ -46,10 +48,7 @@ async function loadSongsFromBackend() {
 /* ================= PAGE LOAD ================= */
 window.addEventListener("load", async () => {
   const user = JSON.parse(localStorage.getItem("user"));
-  if (!user) {
-    window.location.href = "login.html";
-    return;
-  }
+  if (!user) return (window.location.href = "login.html");
 
   loadUserProfile();
   await loadSongsFromBackend();
@@ -57,10 +56,9 @@ window.addEventListener("load", async () => {
   if (!allMusic.length) return;
 
   musicIndex = 1;
-  loadMusic(musicIndex);
+  loadMusic(musicIndex, false);
   generatePlaylist();
   playingNow();
-  updateLikeIcon();
 });
 
 /* ================= USER PROFILE ================= */
@@ -71,119 +69,202 @@ function loadUserProfile() {
 }
 
 /* ================= LOAD MUSIC ================= */
-function loadMusic(index) {
+function loadMusic(index, autoplay = true) {
   const song = allMusic[index - 1];
+  if (!song) return;
+
   musicName.innerText = song.title;
   musicArtist.innerText = song.artist;
   musicImg.src = song.image;
   mainAudio.src = song.audio;
-  updateLikeIcon();
+  mainAudio.load();
+
+  if (autoplay) {
+    mainAudio.play().catch(() => {});
+    playPauseBtn.querySelector("i").innerText = "pause";
+    wrapper.classList.add("paused");
+  }
+
+  syncLikeIcon();
 }
+
+/* ================= AUDIO END ================= */
+mainAudio.addEventListener("ended", () => {
+  if (isLoop) {
+    loadMusic(musicIndex);
+  } else if (isShuffle) {
+    let next;
+    do {
+      next = Math.floor(Math.random() * allMusic.length) + 1;
+    } while (next === musicIndex);
+    musicIndex = next;
+    loadMusic(musicIndex);
+  } else {
+    nextBtn.click();
+  }
+});
 
 /* ================= PLAY / PAUSE ================= */
 function playMusic() {
-  wrapper.classList.add("paused");
+  mainAudio.play().catch(() => {});
   playPauseBtn.querySelector("i").innerText = "pause";
-  mainAudio.play();
+  wrapper.classList.add("paused");
 }
 
 function pauseMusic() {
-  wrapper.classList.remove("paused");
-  playPauseBtn.querySelector("i").innerText = "play_arrow";
   mainAudio.pause();
+  playPauseBtn.querySelector("i").innerText = "play_arrow";
+  wrapper.classList.remove("paused");
 }
 
-playPauseBtn.addEventListener("click", () => {
+playPauseBtn.onclick = () =>
   wrapper.classList.contains("paused") ? pauseMusic() : playMusic();
-});
 
 /* ================= NEXT / PREV ================= */
 nextBtn.onclick = () => {
   musicIndex = musicIndex >= allMusic.length ? 1 : musicIndex + 1;
   loadMusic(musicIndex);
-  playMusic();
   playingNow();
 };
 
 prevBtn.onclick = () => {
   musicIndex = musicIndex <= 1 ? allMusic.length : musicIndex - 1;
   loadMusic(musicIndex);
-  playMusic();
   playingNow();
 };
-// ================= PROGRESS BAR UPDATE =================
+
+/* ================= PROGRESS ================= */
 mainAudio.addEventListener("timeupdate", () => {
   if (!mainAudio.duration) return;
 
-  const progressWidth =
-    (mainAudio.currentTime / mainAudio.duration) * 100;
-  progressBar.style.width = `${progressWidth}%`;
+  progressBar.style.width =
+    (mainAudio.currentTime / mainAudio.duration) * 100 + "%";
 
-  // time display
-  const current = wrapper.querySelector(".current");
-  const duration = wrapper.querySelector(".duration");
-
-  let curMin = Math.floor(mainAudio.currentTime / 60);
-  let curSec = Math.floor(mainAudio.currentTime % 60);
-  if (curSec < 10) curSec = `0${curSec}`;
-
-  let durMin = Math.floor(mainAudio.duration / 60);
-  let durSec = Math.floor(mainAudio.duration % 60);
-  if (durSec < 10) durSec = `0${durSec}`;
-
-  current.innerText = `${curMin}:${curSec}`;
-  duration.innerText = `${durMin}:${durSec}`;
+  document.querySelector(".current").innerText = formatTime(mainAudio.currentTime);
+  document.querySelector(".duration").innerText = formatTime(mainAudio.duration);
 });
-// ================= SEEK / DRAG =================
-progressArea.addEventListener("click", e => {
-  const width = progressArea.clientWidth;
-  const clickX = e.offsetX;
-  const duration = mainAudio.duration;
 
-  mainAudio.currentTime = (clickX / width) * duration;
-});
+progressArea.onclick = e => {
+  mainAudio.currentTime =
+    (e.offsetX / progressArea.clientWidth) * mainAudio.duration;
+};
+
+function formatTime(t) {
+  const m = Math.floor(t / 60);
+  const s = Math.floor(t % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+}
+
+/* ================= SEARCH ================= */
+function searchSong() {
+  const q = searchInput.value.toLowerCase().trim();
+  if (!q) return (generatePlaylist(), musicList.classList.add("show"));
+
+  const ul = musicList.querySelector("ul");
+  ul.innerHTML = "";
+
+  allMusic
+    .filter(s => s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q))
+    .forEach(s => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span>${s.title}</span><span>${s.duration}</span>`;
+      li.onclick = () => {
+        musicIndex = allMusic.findIndex(x => x.id === s.id) + 1;
+        loadMusic(musicIndex);
+        playingNow();
+      };
+      ul.appendChild(li);
+    });
+
+  musicList.classList.add("show");
+}
+
+/* ================= SHUFFLE / LOOP ================= */
+repeatBtn.onclick = () => {
+  if (!isShuffle && !isLoop) {
+    isShuffle = true;
+    repeatBtn.innerText = "shuffle";
+  } else if (isShuffle) {
+    isShuffle = false;
+    isLoop = true;
+    repeatBtn.innerText = "repeat_one";
+  } else {
+    isLoop = false;
+    repeatBtn.innerText = "repeat";
+  }
+};
+
+/* ================= PLAYLIST ================= */
+function generatePlaylist() {
+  const ul = musicList.querySelector("ul");
+  ul.innerHTML = "";
+
+  allMusic.forEach((song, i) => {
+    const li = document.createElement("li");
+    li.setAttribute("li-index", i + 1);
+    li.innerHTML = `<span>${song.title}</span><span>${song.duration}</span>`;
+    li.onclick = () => {
+      musicIndex = i + 1;
+      loadMusic(musicIndex);
+      playingNow();
+    };
+    ul.appendChild(li);
+  });
+}
+
+function playingNow() {
+  document
+    .querySelectorAll(".music-list ul li")
+    .forEach(li =>
+      li.classList.toggle("playing", li.getAttribute("li-index") == musicIndex)
+    );
+}
+
+/* ================= UI ================= */
+showMoreBtn.onclick = () => {
+  generatePlaylist();
+  playingNow();
+  musicList.classList.add("show");
+};
+
+hideMusicBtn.onclick = () => musicList.classList.remove("show");
 
 /* ================= LIKE / UNLIKE ================= */
-likeBtn.addEventListener("click", async () => {
+likeBtn.onclick = async () => {
   const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) return;
+
   const songId = allMusic[musicIndex - 1].id;
-
   const isLiked = likeBtn.innerText === "favorite";
-  const url = isLiked ? "/api/unlike" : "/api/like";
 
-  const res = await fetch(url, {
+  await fetch(isLiked ? "/api/unlike" : "/api/like", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId: user.userId, songId })
   });
 
-  const data = await res.json();
-  alert(data.message);
-
   likeBtn.innerText = isLiked ? "favorite_border" : "favorite";
   loadLikedSongs();
-});
+};
 
-/* ================= LIKED SONGS ================= */
-async function loadLikedSongs() {
+async function syncLikeIcon() {
   const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) return;
+
   const res = await fetch(`/api/likes/${user.userId}`);
-  const songs = await res.json();
+  const likedSongs = await res.json();
+  const songId = allMusic[musicIndex - 1].id;
 
-  const ul = document.getElementById("likedSongsList");
-  ul.innerHTML = "";
-
-  songs.forEach(song => {
-    const li = document.createElement("li");
-    li.innerText = `${song.title} - ${song.artist}`;
-    li.onclick = () => playFromExternalList(song);
-    ul.appendChild(li);
-  });
+  likeBtn.innerText = likedSongs.some(s => s._id === songId)
+    ? "favorite"
+    : "favorite_border";
 }
 
-/* ================= PLAYLIST ================= */
-addToListBtn.addEventListener("click", async () => {
+/* ================= ADD TO PLAYLIST ================= */
+addToListBtn.onclick = async () => {
   const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) return;
+
   const songId = allMusic[musicIndex - 1].id;
 
   const res = await fetch("/api/playlist/add", {
@@ -199,10 +280,33 @@ addToListBtn.addEventListener("click", async () => {
   const data = await res.json();
   alert(data.message);
   loadPlaylists();
-});
+};
+
+/* ================= SIDEBAR DATA ================= */
+async function loadLikedSongs() {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) return;
+
+  const res = await fetch(`/api/likes/${user.userId}`);
+  const songs = await res.json();
+
+  const ul = document.getElementById("likedSongsList");
+  ul.innerHTML = "";
+
+  songs.length
+    ? songs.forEach(s => {
+        const li = document.createElement("li");
+        li.textContent = `${s.title} - ${s.artist}`;
+        li.onclick = () => playFromExternalList(s);
+        ul.appendChild(li);
+      })
+    : (ul.innerHTML = "<li>No liked songs</li>");
+}
 
 async function loadPlaylists() {
   const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) return;
+
   const res = await fetch(`/api/playlists/${user.userId}`);
   const playlists = await res.json();
 
@@ -210,15 +314,16 @@ async function loadPlaylists() {
   ul.innerHTML = "";
 
   playlists.forEach(pl => {
-    const li = document.createElement("li");
-    li.innerText = pl.name;
-    ul.appendChild(li);
+    const t = document.createElement("li");
+    t.innerHTML = `<strong>${pl.name}</strong>`;
+    ul.appendChild(t);
 
-    pl.songs.forEach(song => {
-      const s = document.createElement("li");
-      s.innerText = "• " + song.title;
-      s.onclick = () => playFromExternalList(song);
-      ul.appendChild(s);
+    pl.songs.forEach(s => {
+      const li = document.createElement("li");
+      li.style.marginLeft = "10px";
+      li.textContent = "🎵 " + s.title;
+      li.onclick = () => playFromExternalList(s);
+      ul.appendChild(li);
     });
   });
 }
@@ -236,45 +341,11 @@ function closeProfile() {
   document.querySelector(".profile-btn").style.display = "block";
 }
 
-/* ================= PLAY EXTERNAL ================= */
+/* ================= PLAY FROM SIDEBAR ================= */
 function playFromExternalList(song) {
   mainAudio.src = song.audio;
   musicImg.src = song.image;
   musicName.innerText = song.title;
   musicArtist.innerText = song.artist;
   playMusic();
-}
-
-/* ================= PLAYLIST UI ================= */
-showMoreBtn.onclick = () => musicList.classList.toggle("show");
-hideMusicBtn.onclick = () => showMoreBtn.click();
-
-function generatePlaylist() {
-const ul = document.querySelector(".music-list ul");
-  ul.innerHTML = "";
-
-  allMusic.forEach((song, i) => {
-    const li = document.createElement("li");
-    li.setAttribute("li-index", i + 1);
-    li.innerHTML = `
-      <div class="row">
-        <span>${song.title}</span>
-        <p>${song.artist}</p>
-      </div>
-      <span>${song.duration}</span>
-    `;
-    li.onclick = () => {
-      musicIndex = i + 1;
-      loadMusic(musicIndex);
-      playMusic();
-      playingNow();
-    };
-    ul.appendChild(li);
-  });
-}
-
-function playingNow() {
-  document.querySelectorAll("ul li").forEach(li => {
-    li.classList.toggle("playing", li.getAttribute("li-index") == musicIndex);
-  });
 }

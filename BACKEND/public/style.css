@@ -292,3 +292,19 @@ cursor: pointer;
   margin-bottom: 6px;
   cursor: pointer;
 }
+/* =========================
+   SEARCH BOX – ABOVE PLAYER
+   ========================= */
+
+.search-box {
+  position: fixed;
+  top: 20px;
+  right: 50%;
+  transform: translateX(160px); /* aligns above player */
+
+  width: 320px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  z-index: 1000;
+}
