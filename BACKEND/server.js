@@ -5,6 +5,7 @@ const getAudioDurationInSeconds = require("get-audio-duration").getAudioDuration
 const path = require("path");
 const Song = require("./models/Song.js");
 const User = require("./models/user.js");
+const bcrypt = require("bcrypt");
 
 
 const app = express();
@@ -134,40 +135,63 @@ app.delete("/admin/delete/:id", async (req, res) => {
 
 // ---------- USER REGISTRATION (EXAMPLE) ----------
 app.post("/api/register", async (req, res) => {
-  const { username, email, password } = req.body;
+  try {
+    const { username, email, password } = req.body;
 
-  const userExists = await User.findOne({ email });
-  if (userExists) {
-    return res.status(400).json({ message: "User already exists" });
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    // 🔐 HASH PASSWORD
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = new User({
+      username,
+      email,
+      password: hashedPassword,
+      likedSongs: [],
+      playlists: []
+    });
+
+    await user.save();
+    res.json({ message: "User registered successfully" });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Registration failed" });
   }
-
-  const user = new User({
-    username,
-    email,
-    password,
-    likedSongs: [],
-    playlists: []
-  });
-
-  await user.save();
-  res.json({ message: "User registered successfully" });
 });
+
 // ---------- USER LOGIN (EXAMPLE) ----------
 app.post("/api/login", async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  const user = await User.findOne({ email, password });
-  if (!user) {
-    return res.status(401).json({ message: "Invalid credentials" });
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    // 🔐 COMPARE PASSWORD
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    res.json({
+      message: "Login successful",
+      userId: user._id,
+      username: user.username,
+      email: user.email
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Login failed" });
   }
-
-  res.json({
-    message: "Login successful",
-    userId: user._id,
-    username: user.username,
-    email: user.email
-  });
 });
+
 
 //liked songs
 app.post("/api/like", async (req, res) => {

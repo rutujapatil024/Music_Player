@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "express": "^5.1.0",
     "get-audio-duration": "^4.0.1",
     "mongoose": "^9.0.0",

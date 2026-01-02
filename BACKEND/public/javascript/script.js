@@ -393,3 +393,9 @@ function playFromExternalList(song) {
   musicArtist.innerText = song.artist;
   playMusic();
 }
+/* ================= LIVE SEARCH ================= */
+const searchInput = document.getElementById("searchInput");
+
+searchInput.addEventListener("input", () => {
+  searchSong();
+});
