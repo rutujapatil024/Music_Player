@@ -22,7 +22,9 @@ app.use("/uploads", express.static("uploads"));
 mongoose
   .connect("mongodb://localhost:27017/")
   .then(() => console.log("MongoDB connected"))
-  .catch(err => console.log(err));
+  .catch(err => console.log(err));mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("MongoDB connected"))
+  .catch(err => console.error(err));
 
 // ---------- MULTER STORAGE (IMAGE + AUDIO) ----------
 const storage = multer.diskStorage({
