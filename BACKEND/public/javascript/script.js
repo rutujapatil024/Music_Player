@@ -314,19 +314,63 @@ async function loadPlaylists() {
   ul.innerHTML = "";
 
   playlists.forEach(pl => {
-    const t = document.createElement("li");
-    t.innerHTML = `<strong>${pl.name}</strong>`;
-    ul.appendChild(t);
+    // Playlist title
+    const title = document.createElement("li");
+    title.innerHTML = `<strong>${pl.name}</strong>`;
+    ul.appendChild(title);
 
-    pl.songs.forEach(s => {
+    if (!pl.songs.length) {
+      const empty = document.createElement("li");
+      empty.style.marginLeft = "10px";
+      empty.innerText = "No songs";
+      ul.appendChild(empty);
+      return;
+    }
+
+    pl.songs.forEach(song => {
       const li = document.createElement("li");
       li.style.marginLeft = "10px";
-      li.textContent = "🎵 " + s.title;
-      li.onclick = () => playFromExternalList(s);
+      li.style.display = "flex";
+      li.style.alignItems = "center";
+      li.style.justifyContent = "space-between";
+
+      li.innerHTML = `
+        <span style="cursor:pointer;">🎵 ${song.title}</span>
+        <span 
+          style="color:red; cursor:pointer; font-weight:bold;"
+          title="Remove from playlist"
+        >➖</span>
+      `;
+
+      // ▶ play song when clicking title
+      li.children[0].onclick = () => playFromExternalList(song);
+
+      // ❌ remove song when clicking minus
+      li.children[1].onclick = () =>
+        removeFromPlaylist(pl.name, song._id);
+
       ul.appendChild(li);
     });
   });
 }
+async function removeFromPlaylist(playlistName, songId) {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) return;
+
+  await fetch("/api/playlist/remove", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userId: user.userId,
+      playlistName,
+      songId
+    })
+  });
+
+  // refresh playlist UI
+  loadPlaylists();
+}
+
 
 /* ================= PROFILE SIDEBAR ================= */
 function openProfile() {

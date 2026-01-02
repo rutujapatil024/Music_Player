@@ -8,6 +8,9 @@ const User = require("./models/user.js");
 
 
 const app = express();
+app.get("/", (req, res) => {
+  res.redirect("/login.html");
+});
 
 // basic middleware
 app.use(express.json());
@@ -198,23 +201,42 @@ app.get("/api/likes/:userId", async (req, res) => {
 app.post("/api/playlist/create", async (req, res) => {
   const { userId, name } = req.body;
 
-  await User.findByIdAndUpdate(userId, {
-    $push: { playlists: { name, songs: [] } }
-  });
+  const user = await User.findById(userId);
+
+  const exists = user.playlists.some(p => p.name === name);
+  if (exists) {
+    return res.json({ message: "Playlist already exists" });
+  }
+
+  user.playlists.push({ name, songs: [] });
+  await user.save();
 
   res.json({ message: "Playlist created" });
 });
+
 // add song to playlist
 app.post("/api/playlist/add", async (req, res) => {
   const { userId, playlistName, songId } = req.body;
 
-  await User.updateOne(
-    { _id: userId, "playlists.name": playlistName },
-    { $addToSet: { "playlists.$.songs": songId } }
-  );
+  // check if playlist exists
+  const user = await User.findById(userId);
 
+  let playlist = user.playlists.find(p => p.name === playlistName);
+
+  // if not exists → create it
+  if (!playlist) {
+    user.playlists.push({ name: playlistName, songs: [songId] });
+  } else {
+    // add song if not already there
+    if (!playlist.songs.includes(songId)) {
+      playlist.songs.push(songId);
+    }
+  }
+
+  await user.save();
   res.json({ message: "Song added to playlist" });
 });
+
 // get playlists
 app.get("/api/playlists/:userId", async (req, res) => {
   const user = await User.findById(req.params.userId)

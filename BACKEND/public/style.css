@@ -165,8 +165,6 @@ body {
 }
 
 
-/* music list box */
-
 .music-list {
     position: absolute;
     left: 0;
@@ -292,15 +290,12 @@ cursor: pointer;
   margin-bottom: 6px;
   cursor: pointer;
 }
-/* =========================
-   SEARCH BOX – ABOVE PLAYER
-   ========================= */
 
 .search-box {
   position: fixed;
   top: 20px;
   right: 50%;
-  transform: translateX(160px); /* aligns above player */
+  transform: translateX(160px); 
 
   width: 320px;
   display: flex;
