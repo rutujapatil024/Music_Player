@@ -14,19 +14,30 @@ const app = express();
 /* ================= MIDDLEWARE ================= */
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static("public"));
+
+// 🔒 Disable automatic index.html
+app.use(express.static("public", { index: false }));
+
 app.use("/uploads", express.static("uploads"));
 
-/* ================= ROOT ================= */
+/* ================= ROUTES ================= */
+
+// Always go to login first
 app.get("/", (req, res) => {
   res.redirect("/login.html");
 });
 
+// Serve index.html manually
+app.get("/index.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
 /* ================= MONGODB ================= */
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect("mongodb://127.0.0.1:27017/test")
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.error("MongoDB error:", err));
+
 
 /* ================= MULTER ================= */
 const storage = multer.diskStorage({
@@ -253,6 +264,8 @@ app.get("/api/search", async (req, res) => {
 
 /* ================= SERVER ================= */
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
 
 app.get("/favicon.ico", (req, res) => res.status(204));

@@ -3,6 +3,11 @@ let musicIndex = 1;
 let isShuffle = false;
 let isLoop = false;
 
+if (!localStorage.getItem("userId")) {
+  window.location.href = "/login.html";
+}
+
+
 /* ================= ELEMENTS ================= */
 const wrapper = document.querySelector(".wrapper");
 const musicImg = wrapper.querySelector(".img-area img");
