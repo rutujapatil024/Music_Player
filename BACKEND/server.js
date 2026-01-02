@@ -1,30 +1,34 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const multer = require("multer");
-const getAudioDurationInSeconds = require("get-audio-duration").getAudioDurationInSeconds;
-const path = require("path");
-const Song = require("./models/Song.js");
-const User = require("./models/user.js");
 const bcrypt = require("bcrypt");
+const path = require("path");
+const getAudioDurationInSeconds =
+  require("get-audio-duration").getAudioDurationInSeconds;
 
+const Song = require("./models/Song");
+const User = require("./models/user");
 
 const app = express();
+
+/* ================= MIDDLEWARE ================= */
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static("public"));
+app.use("/uploads", express.static("uploads"));
+
+/* ================= ROOT ================= */
 app.get("/", (req, res) => {
   res.redirect("/login.html");
 });
 
-// basic middleware
-app.use(express.json());
-app.use(express.static("public"));
-app.use("/uploads", express.static("uploads"));
-
-// connect to MongoDB
+/* ================= MONGODB ================= */
 mongoose
-  .connect("mongodb://localhost:27017/")
+  .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB connected"))
-  .catch(err => console.log(err));
+  .catch(err => console.error("MongoDB error:", err));
 
-// ---------- MULTER STORAGE (IMAGE + AUDIO) ----------
+/* ================= MULTER ================= */
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     if (file.fieldname === "image") cb(null, "uploads/images");
@@ -37,113 +41,105 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// ---------- ADD NEW SONG ----------
-app.post("/admin/upload", upload.fields([
-  { name: "image", maxCount: 1 },
-  { name: "audio", maxCount: 1 }
-]), async (req, res) => {
-  try {
-    const { title, artist } = req.body;
+/* ================= SONG ROUTES ================= */
 
-    const imageFile = req.files["image"][0];
-    const audioFile = req.files["audio"][0];
+// ADD SONG
+app.post(
+  "/admin/upload",
+  upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "audio", maxCount: 1 }
+  ]),
+  async (req, res) => {
+    try {
+      const { title, artist } = req.body;
+      const imageFile = req.files.image[0];
+      const audioFile = req.files.audio[0];
 
-    const audioPath = path.join(__dirname, audioFile.path);
+      const audioPath = path.join(__dirname, audioFile.path);
+      const seconds = await getAudioDurationInSeconds(audioPath);
 
-    // calculate audio duration
-    const seconds = await getAudioDurationInSeconds(audioPath);
-    const minutes = Math.floor(seconds / 60);
-    const sec = Math.floor(seconds % 60).toString().padStart(2, "0");
-    const duration = `${minutes}:${sec}`;
+      const duration = `${Math.floor(seconds / 60)}:${Math.floor(
+        seconds % 60
+      ).toString().padStart(2, "0")}`;
 
-    // save to database
-    const song = new Song({
-      title,
-      artist,
-      image: `/uploads/images/${imageFile.filename}`,
-      audio: `/uploads/songs/${audioFile.filename}`,
-      duration
-    });
+      const song = new Song({
+        title,
+        artist,
+        image: `/uploads/images/${imageFile.filename}`,
+        audio: `/uploads/songs/${audioFile.filename}`,
+        duration
+      });
 
-    await song.save();
-
-    res.json({ message: "Song added successfully" });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error uploading song" });
+      await song.save();
+      res.json({ message: "Song added successfully" });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Upload failed" });
+    }
   }
-});
+);
 
-// ---------- GET ALL SONGS ----------
+// GET SONGS
 app.get("/api/songs", async (req, res) => {
   const songs = await Song.find();
   res.json(songs);
 });
 
-// ---------- FULL UPDATE ----------
-app.put("/admin/update-full/:id", upload.fields([
-  { name: "image", maxCount: 1 },
-  { name: "audio", maxCount: 1 }
-]), async (req, res) => {
-  try {
-    const { title, artist } = req.body;
+// UPDATE SONG
+app.put(
+  "/admin/update-full/:id",
+  upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "audio", maxCount: 1 }
+  ]),
+  async (req, res) => {
+    try {
+      const data = {
+        title: req.body.title,
+        artist: req.body.artist
+      };
 
-    const data = { title, artist };
+      if (req.files.image) {
+        data.image = `/uploads/images/${req.files.image[0].filename}`;
+      }
 
-    // update image if new one uploaded
-    if (req.files["image"]) {
-      const img = req.files["image"][0];
-      data.image = `/uploads/images/${img.filename}`;
+      if (req.files.audio) {
+        const audio = req.files.audio[0];
+        const seconds = await getAudioDurationInSeconds(
+          path.join(__dirname, audio.path)
+        );
+        data.audio = `/uploads/songs/${audio.filename}`;
+        data.duration = `${Math.floor(seconds / 60)}:${Math.floor(
+          seconds % 60
+        ).toString().padStart(2, "0")}`;
+      }
+
+      await Song.findByIdAndUpdate(req.params.id, data);
+      res.json({ message: "Song updated" });
+    } catch (err) {
+      res.status(500).json({ message: "Update failed" });
     }
-
-    // update audio if new one uploaded
-    if (req.files["audio"]) {
-      const audio = req.files["audio"][0];
-      const audioPath = path.join(__dirname, audio.path);
-
-      const seconds = await getAudioDurationInSeconds(audioPath);
-      const minutes = Math.floor(seconds / 60);
-      const sec = Math.floor(seconds % 60).toString().padStart(2, "0");
-
-      data.audio = `/uploads/songs/${audio.filename}`;
-      data.duration = `${minutes}:${sec}`;
-    }
-
-    await Song.findByIdAndUpdate(req.params.id, data);
-
-    res.json({ message: "Song updated successfully" });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error updating song" });
   }
-});
+);
 
-// ---------- DELETE SONG ----------
+// DELETE SONG
 app.delete("/admin/delete/:id", async (req, res) => {
-  try {
-    await Song.findByIdAndDelete(req.params.id);
-    res.json({ message: "Song deleted successfully" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error deleting song" });
-  }
+  await Song.findByIdAndDelete(req.params.id);
+  res.json({ message: "Song deleted" });
 });
 
+/* ================= AUTH ================= */
 
-
-// ---------- USER REGISTRATION (EXAMPLE) ----------
+// REGISTER
 app.post("/api/register", async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: "User already exists" });
+    if (await User.findOne({ email })) {
+      return res.status(400).json({ message: "User exists" });
     }
 
-    // 🔐 HASH PASSWORD
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = new User({
@@ -155,144 +151,108 @@ app.post("/api/register", async (req, res) => {
     });
 
     await user.save();
-    res.json({ message: "User registered successfully" });
-
+    res.json({ message: "Registered successfully" });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Registration failed" });
+    res.status(500).json({ message: "Register failed" });
   }
 });
 
-// ---------- USER LOGIN (EXAMPLE) ----------
+// LOGIN
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
+    if (!user) return res.status(401).json({ message: "Invalid login" });
 
-    // 🔐 COMPARE PASSWORD
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) return res.status(401).json({ message: "Invalid login" });
 
     res.json({
-      message: "Login successful",
       userId: user._id,
       username: user.username,
       email: user.email
     });
-
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Login failed" });
+    res.status(500).json({ message: "Login error" });
   }
 });
 
+/* ================= LIKES ================= */
 
-//liked songs
 app.post("/api/like", async (req, res) => {
-  const { userId, songId } = req.body;
-
-  await User.findByIdAndUpdate(
-    userId,
-    { $addToSet: { likedSongs: songId } }
-  );
-
-  res.json({ message: "Song liked" });
+  await User.findByIdAndUpdate(req.body.userId, {
+    $addToSet: { likedSongs: req.body.songId }
+  });
+  res.json({ message: "Liked" });
 });
+
 app.post("/api/unlike", async (req, res) => {
-  const { userId, songId } = req.body;
-
-  await User.findByIdAndUpdate(
-    userId,
-    { $pull: { likedSongs: songId } }
-  );    
-
-  res.json({ message: "Song unliked" });
+  await User.findByIdAndUpdate(req.body.userId, {
+    $pull: { likedSongs: req.body.songId }
+  });
+  res.json({ message: "Unliked" });
 });
-//get liked songs
+
 app.get("/api/likes/:userId", async (req, res) => {
-  const user = await User.findById(req.params.userId)
-    .populate("likedSongs");
-
-  res.json(user.likedSongs);
+  const user = await User.findById(req.params.userId).populate("likedSongs");
+  res.json(user ? user.likedSongs : []);
 });
-// create playlist
+
+/* ================= PLAYLIST ================= */
+
 app.post("/api/playlist/create", async (req, res) => {
-  const { userId, name } = req.body;
-
-  const user = await User.findById(userId);
-
-  const exists = user.playlists.some(p => p.name === name);
-  if (exists) {
-    return res.json({ message: "Playlist already exists" });
+  const user = await User.findById(req.body.userId);
+  if (user.playlists.some(p => p.name === req.body.name)) {
+    return res.json({ message: "Playlist exists" });
   }
-
-  user.playlists.push({ name, songs: [] });
+  user.playlists.push({ name: req.body.name, songs: [] });
   await user.save();
-
   res.json({ message: "Playlist created" });
 });
 
-// add song to playlist
 app.post("/api/playlist/add", async (req, res) => {
-  const { userId, playlistName, songId } = req.body;
+  const user = await User.findById(req.body.userId);
+  let playlist = user.playlists.find(p => p.name === req.body.playlistName);
 
-  // check if playlist exists
-  const user = await User.findById(userId);
-
-  let playlist = user.playlists.find(p => p.name === playlistName);
-
-  // if not exists → create it
   if (!playlist) {
-    user.playlists.push({ name: playlistName, songs: [songId] });
-  } else {
-    // add song if not already there
-    if (!playlist.songs.includes(songId)) {
-      playlist.songs.push(songId);
-    }
+    user.playlists.push({
+      name: req.body.playlistName,
+      songs: [req.body.songId]
+    });
+  } else if (!playlist.songs.includes(req.body.songId)) {
+    playlist.songs.push(req.body.songId);
   }
 
   await user.save();
-  res.json({ message: "Song added to playlist" });
+  res.json({ message: "Added to playlist" });
 });
 
-// get playlists
-app.get("/api/playlists/:userId", async (req, res) => {
-  const user = await User.findById(req.params.userId)
-    .populate("playlists.songs");
-
-  res.json(user.playlists);
-});
-// remove song from playlist
 app.post("/api/playlist/remove", async (req, res) => {
-  const { userId, playlistName, songId } = req.body;  
   await User.updateOne(
-    { _id: userId, "playlists.name": playlistName },
-    { $pull: { "playlists.$.songs": songId } }
-  );  
-  res.json({ message: "Song removed from playlist" });
+    { _id: req.body.userId, "playlists.name": req.body.playlistName },
+    { $pull: { "playlists.$.songs": req.body.songId } }
+  );
+  res.json({ message: "Removed from playlist" });
 });
 
-//search songs
+app.get("/api/playlists/:userId", async (req, res) => {
+  const user = await User.findById(req.params.userId).populate(
+    "playlists.songs"
+  );
+  res.json(user ? user.playlists : []);
+});
+
+/* ================= SEARCH ================= */
 app.get("/api/search", async (req, res) => {
-  const query = req.query.q;
-
   const songs = await Song.find({
-    title: { $regex: query, $options: "i" }
+    title: { $regex: req.query.q, $options: "i" }
   });
-
   res.json(songs);
 });
 
-// ---------- START SERVER ----------
-app.listen(5000, () => {
-  console.log("Server running on http://localhost:5000");
-});
+/* ================= SERVER ================= */
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+
 app.get("/favicon.ico", (req, res) => res.status(204));
-  return;
-  
