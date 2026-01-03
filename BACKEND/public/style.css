@@ -32,7 +32,7 @@ body {
     border-radius: 12px;
     padding: 18px 22px;
     background: var(--white);
-    /* box-shadow: 0px 6px 15px var(--lightbshadow); */
+    box-shadow: 0px 6px 15px var(--lightbshadow);
     overflow: hidden; 
 }
 
@@ -68,7 +68,7 @@ body {
     overflow: hidden;
     margin-top: 10px;
     border-radius: 12px;
-    /* box-shadow: 0px 6px 12px var(--lightbshadow); */
+    box-shadow: 0px 6px 12px var(--lightbshadow);
 }
 
 .img-area img {

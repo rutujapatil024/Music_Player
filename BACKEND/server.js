@@ -11,17 +11,16 @@ const User = require("./models/user");
 
 const app = express();
 
-/* ================= MIDDLEWARE ================= */
+//middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 🔒 Disable automatic index.html
+// Disable automatic index.html
 app.use(express.static("public", { index: false }));
 
 app.use("/uploads", express.static("uploads"));
 
-/* ================= ROUTES ================= */
-
+//ROUTES
 // Always go to login first
 app.get("/", (req, res) => {
   res.redirect("/login.html");
@@ -32,15 +31,15 @@ app.get("/index.html", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-/* ================= MONGODB ================= */
+//mongoose connection
 mongoose
   .connect("mongodb://127.0.0.1:27017/test")
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.error("MongoDB error:", err));
 
 
-/* ================= MULTER ================= */
-const storage = multer.diskStorage({
+//multer for file uploads
+  const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     if (file.fieldname === "image") cb(null, "uploads/images");
     else cb(null, "uploads/songs");
@@ -52,8 +51,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-/* ================= SONG ROUTES ================= */
-
+//song CRUD operations
 // ADD SONG
 app.post(
   "/admin/upload",
@@ -140,8 +138,7 @@ app.delete("/admin/delete/:id", async (req, res) => {
   res.json({ message: "Song deleted" });
 });
 
-/* ================= AUTH ================= */
-
+//authentication routes
 // REGISTER
 app.post("/api/register", async (req, res) => {
   try {
@@ -196,8 +193,7 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-/* ================= LIKES ================= */
-
+//like/unlike routes
 app.post("/api/like", async (req, res) => {
   await User.findByIdAndUpdate(req.body.userId, {
     $addToSet: { likedSongs: req.body.songId }
@@ -217,8 +213,7 @@ app.get("/api/likes/:userId", async (req, res) => {
   res.json(user ? user.likedSongs : []);
 });
 
-/* ================= PLAYLIST ================= */
-
+//playlist routes
 app.post("/api/playlist/create", async (req, res) => {
   const user = await User.findById(req.body.userId);
   if (user.playlists.some(p => p.name === req.body.name)) {
@@ -261,7 +256,7 @@ app.get("/api/playlists/:userId", async (req, res) => {
   res.json(user ? user.playlists : []);
 });
 
-/* ================= SEARCH ================= */
+//search route
 app.get("/api/search", async (req, res) => {
   const songs = await Song.find({
     title: { $regex: req.query.q, $options: "i" }
@@ -269,7 +264,7 @@ app.get("/api/search", async (req, res) => {
   res.json(songs);
 });
 
-/* ================= SERVER ================= */
+//server start
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
