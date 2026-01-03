@@ -147,6 +147,12 @@ app.post("/api/register", async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
+    if (!password || password.length < 8) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters long"
+      });
+    }
+
     if (await User.findOne({ email })) {
       return res.status(400).json({ message: "User exists" });
     }
@@ -167,6 +173,7 @@ app.post("/api/register", async (req, res) => {
     res.status(500).json({ message: "Register failed" });
   }
 });
+
 
 // LOGIN
 app.post("/api/login", async (req, res) => {
